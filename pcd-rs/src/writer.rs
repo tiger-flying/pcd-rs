@@ -125,10 +125,14 @@ pub struct Writer<T, W>
 where
     W: Write + Seek,
 {
+    width: u64,
+    height: u64,
     data_kind: DataKind,
     record_spec: Schema,
     writer: W,
     num_records: usize,
+    width_arg_begin: u64,
+    width_arg_width: usize,
     points_arg_begin: u64,
     points_arg_width: usize,
     finished: bool,
@@ -171,7 +175,7 @@ where
             );
         }
 
-        let (points_arg_begin, points_arg_width) = {
+        let (width_arg_begin, width_arg_width, points_arg_begin, points_arg_width) = {
             let fields_args: Vec<_> = record_spec
                 .iter()
                 .map(|field| field.name.to_owned())
@@ -224,6 +228,7 @@ where
             };
 
             let points_arg_width = (usize::max_value() as f64).log10().floor() as usize + 1;
+            let width_arg_width = (usize::max_value() as f64).log10().floor() as usize + 1;
 
             writeln!(writer, "# .PCD v.7 - Point Cloud Data file format")?;
             writeln!(writer, "VERSION .7")?;
@@ -231,7 +236,10 @@ where
             writeln!(writer, "SIZE {}", size_args.join(" "))?;
             writeln!(writer, "TYPE {}", type_args.join(" "))?;
             writeln!(writer, "COUNT {}", count_args.join(" "))?;
-            writeln!(writer, "WIDTH {}", width)?;
+            // writeln!(writer, "WIDTH {}", width)?;
+            write!(writer, "WIDTH ")?;
+            let width_arg_begin = writer.seek(SeekFrom::Current(0))?;
+            writeln!(writer, "{}", width)?;
             writeln!(writer, "HEIGHT {}", height)?;
             writeln!(writer, "VIEWPOINT {}", viewpoint_args.join(" "))?;
 
@@ -244,14 +252,23 @@ where
                 DataKind::Ascii => writeln!(writer, "DATA ascii")?,
             }
 
-            (points_arg_begin, points_arg_width)
+            (
+                width_arg_begin,
+                width_arg_width,
+                points_arg_begin,
+                points_arg_width,
+            )
         };
 
         let seq_writer = Self {
+            width,
+            height,
             data_kind,
             record_spec,
             writer,
             num_records: 0,
+            width_arg_begin,
+            width_arg_width,
             points_arg_begin,
             points_arg_width,
             finished: false,
@@ -272,6 +289,25 @@ where
             self.num_records,
             width = self.points_arg_width
         )?;
+
+        if (self.num_records as u64) != self.width * self.height {
+            if self.height != 0 && (self.num_records as u64) % self.height == 0 {
+                let width = (self.num_records as u64) / self.height;
+                self.writer.seek(SeekFrom::Start(self.width_arg_begin))?;
+                write!(
+                    self.writer,
+                    "{:<width$}",
+                    width,
+                    width = self.width_arg_width
+                )?;
+            } else {
+                self.finished = true;
+                return Err(Error::new_invalid_writer_configuration_error(
+                    "The number of points != width * height",
+                ));
+            }
+        }
+
         self.finished = true;
         Ok(())
     }
