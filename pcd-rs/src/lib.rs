@@ -25,14 +25,14 @@
 //! [Result\<DynRecord\>](DynRecord).
 //!
 //! ```rust
-//! # fn main() -> pcd_rs::pcd_rsResult<()>  {
+//! # fn main() -> pcd_rs::Result<()>  {
 //! use pcd_rs::DynReader;
 //!
 //! // Declare the reader
 //! let reader = DynReader::open("test_files/binary.pcd")?;
 //!
 //! // The reader itself is an iterator of records
-//! let points: Result<Vec<_>> = reader.collect();
+//! let points: Result<Vec<_>, _> = reader.collect();
 //! println!("There are {} points found.", points?.len());
 //! # Ok(())
 //! # }
@@ -47,7 +47,7 @@
 //! [.finish()](DynWriter::finish) in the end.
 //!
 //! ```rust
-//! # fn main() -> pcd_rs::pcd_rs::Result<()>  {
+//! # fn main() -> pcd_rs::Result<()>  {
 //! use pcd_rs::{DataKind, DynRecord, DynWriter, Field, Schema, ValueKind, WriterInit};
 //!
 //! // Declare point data
@@ -202,6 +202,7 @@ attributes.
 pub use byteorder;
 
 pub mod error;
+mod lzf;
 pub mod metas;
 pub mod prelude;
 pub mod reader;
